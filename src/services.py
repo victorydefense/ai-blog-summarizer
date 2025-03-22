@@ -1,12 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
-from openai import OpenAI
-
-client = OpenAI(api_key=OPENAI_API_KEY)
-from src.config import OPENAI_API_KEY
+from src.config import OPENAI_API_KEY  # Import the API key first
 from src.models import SummarizeResponse
+from openai import OpenAI  # Then import OpenAI
 
-# Set OpenAI API key
+# Create a client using the new OpenAI interface with the API key
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def extract_blog_text(url: str) -> str:
     try:
