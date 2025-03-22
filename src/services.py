@@ -41,8 +41,9 @@ def extract_blog_text(url: str) -> str:
 
 def summarize_blog(url: str) -> SummarizeResponse:
     """
-    Extracts text from the blog, sends it to the OpenAI API to generate a bullet point summary,
-    and returns the summary with references and an image suggestion.
+    Extracts text from the blog, sends it to the OpenAI API using ChatCompletion
+    to generate a bullet point summary, and returns the summary with references
+    and an image suggestion.
     """
     blog_text = extract_blog_text(url)
     
@@ -64,14 +65,17 @@ def summarize_blog(url: str) -> SummarizeResponse:
     )
     
     try:
-        response = openai.Completion.create(
-            engine="text-davinci-003",  # or any appropriate model
-            prompt=prompt,
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # or another appropriate model
+            messages=[
+                {"role": "system", "content": "You are an expert content summarizer."},
+                {"role": "user", "content": prompt}
+            ],
             max_tokens=300,
             temperature=0.7,
         )
         
-        summary_text = response.choices[0].text.strip()
+        summary_text = response.choices[0].message.content.strip()
     
     except Exception as e:
         print(f"Error from OpenAI API: {e}")
