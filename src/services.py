@@ -1,15 +1,102 @@
+import requests
+from bs4 import BeautifulSoup
+import openai
 from src.config import OPENAI_API_KEY
 from src.models import SummarizeResponse
 
+# Set OpenAI API key
+openai.api_key = OPENAI_API_KEY
+
+def extract_blog_text(url: str) -> str:
+    """
+    Extracts and returns the main text content from the given blog URL.
+    """
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Attempt to locate the main content
+        article = soup.find("article")
+        if article:
+            paragraphs = article.find_all("p")
+        else:
+            paragraphs = soup.find_all("p")
+        
+        text = "\n".join([p.get_text() for p in paragraphs])
+        return text.strip()
+    
+    except Exception as e:
+        print(f"Error extracting text from {url}: {e}")
+        return ""
+
 def summarize_blog(url: str) -> SummarizeResponse:
-    # Placeholder for text extraction, OpenAI API call, and image suggestion logic
-    # For now, return a sample response
-    bullet_points = [
-        "Bullet point 1: Key insight from the blog.",
-        "Bullet point 2: Another important detail."
-    ]
-    references = [url]
-    image_suggestion = "Consider using a sleek tech-themed graphic."
+    """
+    Extracts text from the blog, sends it to the OpenAI API to generate a bullet point summary,
+    and returns the summary with references and an image suggestion.
+    """
+    blog_text = extract_blog_text(url)
+    
+    if not blog_text:
+        return SummarizeResponse(
+            bullet_points=["Error extracting content from the provided URL."],
+            references=[url],
+            image_suggestion="No image suggestion available due to extraction error."
+        )
+    
+    # Truncate text if too long (adjust limit as needed)
+    truncated_text = blog_text[:4000]
+    
+    prompt = (
+        "You are an expert content summarizer. Given the following blog content, "
+        "generate a concise bullet point summary suitable for a LinkedIn post. "
+        "Include references (if available) and provide one creative image suggestion. "
+        f"Blog content:\n\n{truncated_text}"
+    )
+    
+    try:
+        response = openai.Completion.create(
+            engine="text-davinci-003",  # or any appropriate model
+            prompt=prompt,
+            max_tokens=300,
+            temperature=0.7,
+        )
+        
+        summary_text = response.choices[0].text.strip()
+    
+    except Exception as e:
+        print(f"Error from OpenAI API: {e}")
+        return SummarizeResponse(
+            bullet_points=["Error generating summary from OpenAI API."],
+            references=[url],
+            image_suggestion="No image suggestion available due to API error."
+        )
+    
+    # Parse the summary output: Look for bullet points (lines starting with "-"),
+    # lines containing "Reference:" for references, and a line with "Image:" for image suggestion.
+    bullet_points = []
+    references = []
+    image_suggestion = ""
+    
+    for line in summary_text.splitlines():
+        line = line.strip()
+        if line.startswith("-"):
+            bullet_points.append(line[1:].strip())
+        elif "Reference:" in line:
+            ref = line.split("Reference:")[-1].strip()
+            references.append(ref)
+        elif "Image:" in line:
+            image_suggestion = line.split("Image:")[-1].strip()
+    
+    # Fallback if no bullet points were parsed
+    if not bullet_points:
+        bullet_points = summary_text.split("\n")
+    
+    # Ensure defaults for references and image suggestion
+    if not references:
+        references = [url]
+    if not image_suggestion:
+        image_suggestion = "Consider using a modern tech-themed graphic with AI imagery."
     
     return SummarizeResponse(
         bullet_points=bullet_points,
