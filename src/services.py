@@ -8,21 +8,30 @@ from src.models import SummarizeResponse
 openai.api_key = OPENAI_API_KEY
 
 def extract_blog_text(url: str) -> str:
-    """
-    Extracts and returns the main text content from the given blog URL.
-    """
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         
-        # Attempt to locate the main content
+        # Try to locate an <article> element first.
         article = soup.find("article")
         if article:
             paragraphs = article.find_all("p")
-        else:
-            paragraphs = soup.find_all("p")
+            text = "\n".join([p.get_text() for p in paragraphs])
+            if text.strip():
+                return text.strip()
         
+        # If no <article> was found or text is empty,
+        # try to find the div with the class "text-rich-text-blog"
+        blog_div = soup.find("div", class_="text-rich-text-blog")
+        if blog_div:
+            paragraphs = blog_div.find_all("p")
+            text = "\n".join([p.get_text() for p in paragraphs])
+            if text.strip():
+                return text.strip()
+        
+        # Fallback: get all paragraphs in the page
+        paragraphs = soup.find_all("p")
         text = "\n".join([p.get_text() for p in paragraphs])
         return text.strip()
     
